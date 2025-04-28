@@ -57,6 +57,57 @@ app.get('/api/users', async function (req, res) {
   }
 })
 
+
+app.get('/api/users/:_id/logs', async function (req, res) {
+  const { from, to, limit } = req.query
+  const userId = req.params._id
+  //validate userId
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: 'Invalid user ID' })
+  }
+  try {
+    const matchingUser = await User.findById(userId)
+    if (!matchingUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+    let query = { userId: matchingUser._id }
+    if (from) {
+      const fromDate = new Date(from)
+      if (isNaN(fromDate)) {
+        return res.status(400).json({ error: 'Invalid from date' })
+      }
+      query.date = { $gte: fromDate }
+    }
+    if (to) {
+      const toDate = new Date(to)
+      if (isNaN(toDate)) {
+        return res.status(400).json({ error: 'Invalid to date' })
+      }
+      query.date = query.date ? { ...query.date, $lte: toDate } : { $lte: toDate }
+    }
+    const exercises = await Exercise.find(query).limit(limit ? parseInt(limit) : 0)
+    if (!exercises) {
+      return res.status(404).json({ error: 'No exercises found' })
+    }
+    return res.status(200).json({
+      username: matchingUser.username,
+      count: exercises.length,
+      _id: matchingUser._id,
+      log: exercises.map(exercises => ({
+        description: exercises.description,
+        duration: exercises.duration,
+        date: exercises.date.toDateString()
+      }))
+    })
+  } catch (error) {
+    return res.status(500).json({ error: error.message })
+  }
+})
+
+
+
+
+
 app.post('/api/users/:_id/exercises', async function (req, res) {
   const { description, duration, date } = req.body
   // validate description and duration
